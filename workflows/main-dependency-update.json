@@ -1,0 +1,705 @@
+{
+  "name": "Main Dependency Update Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "projectPath",
+              "value": "={{$env.DEFAULT_PROJECT_PATH || $json.projectPath}}"
+            },
+            {
+              "name": "branchName",
+              "value": "=automated-deps-update-{{$now.format('YYYY-MM-DD-HHmmss')}}"
+            },
+            {
+              "name": "runId",
+              "value": "={{$now.toUnixInteger()}}"
+            },
+            {
+              "name": "maxRetries",
+              "value": "={{$env.MAX_RETRY_ATTEMPTS || 3}}"
+            },
+            {
+              "name": "currentRetry",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-variables",
+      "name": "Set Project Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "command": "=cd {{$json.projectPath}} && git status --porcelain",
+        "options": {}
+      },
+      "id": "git-status-check",
+      "name": "Git Status Check",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "command": "=cd {{$json.projectPath}} && git checkout -b {{$json.branchName}} && git push -u origin {{$json.branchName}}",
+        "options": {}
+      },
+      "id": "create-feature-branch",
+      "name": "Create Feature Branch",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "command": "={{$env.NODE_PATH}}/scripts/update-dependencies.sh {{$json.projectPath}} /tmp/ncu-{{$json.runId}}.json",
+        "options": {}
+      },
+      "id": "run-ncu",
+      "name": "Run npm-check-updates",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst ncuData = JSON.parse(output);\n\nconst updates = [];\nif (ncuData.upgrades && typeof ncuData.upgrades === 'object') {\n  for (const [pkg, version] of Object.entries(ncuData.upgrades)) {\n    const currentVersion = ncuData.currentVersions?.dependencies?.[pkg] || \n                          ncuData.currentVersions?.devDependencies?.[pkg] || \n                          'unknown';\n    updates.push({\n      package: pkg,\n      from: currentVersion,\n      to: version,\n      type: currentVersion.split('.')[0] !== version.split('.')[0] ? 'major' : 'minor'\n    });\n  }\n}\n\nreturn {\n  json: {\n    ...ncuData,\n    updates: updates,\n    totalUpdates: updates.length,\n    hasUpdates: updates.length > 0\n  }\n};"
+      },
+      "id": "parse-ncu-output",
+      "name": "Parse Dependency Updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasUpdates}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-has-updates",
+      "name": "Has Updates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "command": "=cd {{$json.projectPath}} && ncu -u && npm install",
+        "options": {}
+      },
+      "id": "apply-updates",
+      "name": "Apply Dependency Updates",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "command": "=cd {{$json.projectPath}} && git add package.json package-lock.json && git commit -m \"chore: update dependencies [automated]\\n\\nUpdated {{$json.totalUpdates}} dependencies\\nRun ID: {{$json.runId}}\"",
+        "options": {}
+      },
+      "id": "commit-dependencies",
+      "name": "Git Commit Dependencies",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1850, 200]
+    },
+    {
+      "parameters": {
+        "command": "={{$env.NODE_PATH}}/scripts/run-tests.sh {{$json.projectPath}} /tmp/test-{{$json.runId}}.json",
+        "options": {
+          "continueOnFail": true
+        }
+      },
+      "id": "run-tests",
+      "name": "Run Tests & Build",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2050, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout || '{}';\nconst testResults = JSON.parse(output);\n\nconst hasErrors = testResults.test?.exitCode !== 0 || testResults.build?.exitCode !== 0;\n\nreturn {\n  json: {\n    ...testResults,\n    hasErrors: hasErrors,\n    needsClaudeFix: hasErrors,\n    errorContext: JSON.stringify({\n      testErrors: testResults.test?.errors || '',\n      buildErrors: testResults.build?.errors || '',\n      testOutput: testResults.test?.output || '',\n      buildOutput: testResults.build?.output || ''\n    })\n  }\n};"
+      },
+      "id": "parse-test-results",
+      "name": "Parse Test Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasErrors}}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "check-tests-passed",
+      "name": "Tests Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2450, 200]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "currentRetry",
+              "value": "=0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "init-retry-counter",
+      "name": "Initialize Retry Counter",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [2650, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Write error context to temp file for Claude script\nconst fs = require('fs');\nconst errorFile = `/tmp/errors-${$json.runId}.json`;\nfs.writeFileSync(errorFile, $json.errorContext);\n\nreturn {\n  json: {\n    ...$json,\n    errorFile: errorFile\n  }\n};"
+      },
+      "id": "prepare-error-context",
+      "name": "Prepare Error Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2850, 350]
+    },
+    {
+      "parameters": {
+        "command": "={{$env.NODE_PATH}}/scripts/apply-claude-fix.sh {{$json.projectPath}} {{$json.errorFile}} {{$env.CLAUDE_API_KEY}} /tmp/claude-fix-{{$json.runId}}.json",
+        "options": {}
+      },
+      "id": "call-claude-api",
+      "name": "Call Claude API",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [3050, 350],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst claudeData = JSON.parse(output);\n\nif (!claudeData.success) {\n  throw new Error(`Claude API failed: ${claudeData.error}`);\n}\n\nreturn {\n  json: {\n    ...$json,\n    fixes: claudeData.fixes,\n    fixCount: claudeData.fixCount,\n    claudeResponse: claudeData\n  }\n};"
+      },
+      "id": "parse-claude-response",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3250, 350]
+    },
+    {
+      "parameters": {
+        "command": "={{$env.NODE_PATH}}/scripts/apply-file-fixes.sh {{$json.projectPath}} /tmp/claude-fix-{{$json.runId}}.json",
+        "options": {}
+      },
+      "id": "apply-fixes",
+      "name": "Apply File Fixes",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [3450, 350]
+    },
+    {
+      "parameters": {
+        "command": "=cd {{$json.projectPath}} && git add . && git commit -m \"fix: apply AI-generated fixes for errors\\n\\nFixed {{$json.fixCount}} files\\nAttempt: {{$json.currentRetry + 1}}/{{$json.maxRetries}}\"",
+        "options": {}
+      },
+      "id": "commit-fixes",
+      "name": "Git Commit Fixes",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [3650, 350]
+    },
+    {
+      "parameters": {
+        "command": "={{$env.NODE_PATH}}/scripts/run-tests.sh {{$json.projectPath}} /tmp/test-retry-{{$json.runId}}-{{$json.currentRetry}}.json",
+        "options": {
+          "continueOnFail": true
+        }
+      },
+      "id": "rerun-tests",
+      "name": "Re-run Tests",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [3850, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout || '{}';\nconst testResults = JSON.parse(output);\n\nconst hasErrors = testResults.test?.exitCode !== 0 || testResults.build?.exitCode !== 0;\nconst shouldRetry = hasErrors && parseInt($json.currentRetry) < parseInt($json.maxRetries) - 1;\n\nreturn {\n  json: {\n    ...$json,\n    hasErrors: hasErrors,\n    shouldRetry: shouldRetry,\n    currentRetry: parseInt($json.currentRetry) + 1,\n    lastTestResults: testResults\n  }\n};"
+      },
+      "id": "check-retry",
+      "name": "Check Retry Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4050, 350]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.shouldRetry}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "should-retry",
+      "name": "Should Retry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4250, 350]
+    },
+    {
+      "parameters": {
+        "command": "={{$env.NODE_PATH}}/scripts/validate-changes.sh {{$json.projectPath}} /tmp/validation-{{$json.runId}}.json",
+        "options": {}
+      },
+      "id": "final-validation",
+      "name": "Final Validation",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2650, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout || '{}';\nconst validationResult = JSON.parse(output);\n\nreturn {\n  json: {\n    ...$json,\n    validationResult: validationResult,\n    allTestsPassed: validationResult.success\n  }\n};"
+      },
+      "id": "parse-validation",
+      "name": "Parse Validation Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2850, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_REPO_OWNER}}/{{$env.GITHUB_REPO_NAME}}/pulls",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GITHUB_TOKEN}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "=chore(deps): automated dependency updates {{$now.format('YYYY-MM-DD')}}"
+            },
+            {
+              "name": "body",
+              "value": "=## Automated Dependency Update\\n\\n**Run ID**: {{$json.runId}}\\n**Updates**: {{$json.totalUpdates}} dependencies\\n**AI Fixes Applied**: {{$json.fixCount || 0}}\\n**Status**: {{$json.allTestsPassed ? '✓ All tests passed' : '⚠ Some tests failed'}}\\n\\n### Changed Dependencies\\n{{$json.updates.map(u => `- ${u.package}: ${u.from} → ${u.to} (${u.type})`).join('\\n')}}\\n\\n---\\n*Generated by n8n automation*"
+            },
+            {
+              "name": "head",
+              "value": "={{$json.branchName}}"
+            },
+            {
+              "name": "base",
+              "value": "main"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-pull-request",
+      "name": "Create GitHub Pull Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [3050, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prResponse = $input.first().json;\n\nreturn {\n  json: {\n    ...$json,\n    prUrl: prResponse.html_url,\n    prNumber: prResponse.number,\n    prCreated: true\n  }\n};"
+      },
+      "id": "extract-pr-info",
+      "name": "Extract PR Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3250, 100]
+    },
+    {
+      "parameters": {},
+      "id": "success-end",
+      "name": "Success",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3450, 100]
+    },
+    {
+      "parameters": {},
+      "id": "no-updates-end",
+      "name": "No Updates Available",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {},
+      "id": "max-retries-reached",
+      "name": "Max Retries Reached",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [4450, 500]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Project Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Project Variables": {
+      "main": [
+        [
+          {
+            "node": "Git Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Status Check": {
+      "main": [
+        [
+          {
+            "node": "Create Feature Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Feature Branch": {
+      "main": [
+        [
+          {
+            "node": "Run npm-check-updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run npm-check-updates": {
+      "main": [
+        [
+          {
+            "node": "Parse Dependency Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Dependency Updates": {
+      "main": [
+        [
+          {
+            "node": "Has Updates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Updates?": {
+      "main": [
+        [
+          {
+            "node": "Apply Dependency Updates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Updates Available",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Dependency Updates": {
+      "main": [
+        [
+          {
+            "node": "Git Commit Dependencies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Commit Dependencies": {
+      "main": [
+        [
+          {
+            "node": "Run Tests & Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Tests & Build": {
+      "main": [
+        [
+          {
+            "node": "Parse Test Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Test Results": {
+      "main": [
+        [
+          {
+            "node": "Tests Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tests Passed?": {
+      "main": [
+        [
+          {
+            "node": "Final Validation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Initialize Retry Counter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Retry Counter": {
+      "main": [
+        [
+          {
+            "node": "Prepare Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Context": {
+      "main": [
+        [
+          {
+            "node": "Call Claude API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude API": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Apply File Fixes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply File Fixes": {
+      "main": [
+        [
+          {
+            "node": "Git Commit Fixes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Commit Fixes": {
+      "main": [
+        [
+          {
+            "node": "Re-run Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-run Tests": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Limit": {
+      "main": [
+        [
+          {
+            "node": "Should Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Retry?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Max Retries Reached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Validation": {
+      "main": [
+        [
+          {
+            "node": "Parse Validation Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Validation Results": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Pull Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Pull Request": {
+      "main": [
+        [
+          {
+            "node": "Extract PR Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PR Info": {
+      "main": [
+        [
+          {
+            "node": "Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-11T00:00:00.000Z",
+  "versionId": "1"
+}

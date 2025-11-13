@@ -1,0 +1,34 @@
+{
+  "name": "ng-ncu-n8n",
+  "version": "1.0.0",
+  "description": "Automated Angular dependency updates with n8n, Claude AI, and Confluence documentation",
+  "main": "index.js",
+  "scripts": {
+    "n8n": "n8n start",
+    "n8n:dev": "n8n start --tunnel",
+    "setup": "node scripts/setup.js",
+    "test:scripts": "bash scripts/test-all.sh"
+  },
+  "keywords": [
+    "n8n",
+    "automation",
+    "angular",
+    "npm-check-updates",
+    "claude",
+    "confluence",
+    "mcp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "n8n": "^1.70.0"
+  },
+  "devDependencies": {
+    "@angular/cli": "^19.0.0",
+    "npm-check-updates": "^17.1.11"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,46 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# n8n data
+.n8n/
+*.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build output
+dist/
+build/
+
+# Test output
+coverage/
+.nyc_output/
+
+# MCP cache
+.mcp-cache/
+
+# Backup files
+*.bak
+*.backup

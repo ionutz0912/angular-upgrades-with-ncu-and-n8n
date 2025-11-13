@@ -1,0 +1,202 @@
+<h1>Dependency Update Run - {{runId}}</h1>
+
+<ac:structured-macro ac:name="info">
+  <ac:rich-text-body>
+    <p><strong>Automated dependency update executed by n8n workflow</strong></p>
+  </ac:rich-text-body>
+</ac:structured-macro>
+
+<h2>Summary</h2>
+<table>
+  <tbody>
+    <tr>
+      <td><strong>Run ID</strong></td>
+      <td>{{runId}}</td>
+    </tr>
+    <tr>
+      <td><strong>Timestamp</strong></td>
+      <td>{{timestamp}}</td>
+    </tr>
+    <tr>
+      <td><strong>Project Path</strong></td>
+      <td><code>{{projectPath}}</code></td>
+    </tr>
+    <tr>
+      <td><strong>Branch Name</strong></td>
+      <td><code>{{branchName}}</code></td>
+    </tr>
+    <tr>
+      <td><strong>Total Updates</strong></td>
+      <td>{{totalUpdates}}</td>
+    </tr>
+    <tr>
+      <td><strong>AI Fixes Applied</strong></td>
+      <td>{{fixCount}}</td>
+    </tr>
+    <tr>
+      <td><strong>Overall Status</strong></td>
+      <td>
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">{{statusColor}}</ac:parameter>
+          <ac:parameter ac:name="title">{{statusText}}</ac:parameter>
+        </ac:structured-macro>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>📦 Dependencies Updated</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>From Version</th>
+      <th>To Version</th>
+      <th>Change Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each updates}}
+    <tr>
+      <td><code>{{this.package}}</code></td>
+      <td>{{this.from}}</td>
+      <td>{{this.to}}</td>
+      <td>
+        {{#if (eq this.type 'major')}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Red</ac:parameter>
+          <ac:parameter ac:name="title">MAJOR</ac:parameter>
+        </ac:structured-macro>
+        {{else}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Blue</ac:parameter>
+          <ac:parameter ac:name="title">MINOR/PATCH</ac:parameter>
+        </ac:structured-macro>
+        {{/if}}
+      </td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+{{#if hasErrors}}
+<h2>⚠️ Errors Encountered</h2>
+
+<ac:structured-macro ac:name="warning">
+  <ac:rich-text-body>
+    <p>Errors were detected during testing and build. AI-powered fixes were applied.</p>
+  </ac:rich-text-body>
+</ac:structured-macro>
+
+<h3>Test Errors</h3>
+<ac:structured-macro ac:name="code">
+  <ac:parameter ac:name="language">bash</ac:parameter>
+  <ac:parameter ac:name="title">Test Errors</ac:parameter>
+  <ac:plain-text-body><![CDATA[
+{{testErrors}}
+  ]]></ac:plain-text-body>
+</ac:structured-macro>
+
+<h3>Build Errors</h3>
+<ac:structured-macro ac:name="code">
+  <ac:parameter ac:name="language">bash</ac:parameter>
+  <ac:parameter ac:name="title">Build Errors</ac:parameter>
+  <ac:plain-text-body><![CDATA[
+{{buildErrors}}
+  ]]></ac:plain-text-body>
+</ac:structured-macro>
+
+<h2>🤖 AI-Generated Solutions</h2>
+
+{{#each fixes}}
+<h3>Fix {{@index}}: {{this.file}}</h3>
+<p><strong>Reason:</strong> {{this.reason}}</p>
+
+<ac:structured-macro ac:name="code">
+  <ac:parameter ac:name="language">typescript</ac:parameter>
+  <ac:parameter ac:name="title">{{this.file}}</ac:parameter>
+  <ac:plain-text-body><![CDATA[
+{{this.content}}
+  ]]></ac:plain-text-body>
+</ac:structured-macro>
+{{/each}}
+
+{{/if}}
+
+<h2>✅ Test & Validation Results</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Test Type</th>
+      <th>Status</th>
+      <th>Exit Code</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Linting</td>
+      <td>
+        {{#if validationResult.lint.passed}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Green</ac:parameter>
+          <ac:parameter ac:name="title">PASSED</ac:parameter>
+        </ac:structured-macro>
+        {{else}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Red</ac:parameter>
+          <ac:parameter ac:name="title">FAILED</ac:parameter>
+        </ac:structured-macro>
+        {{/if}}
+      </td>
+      <td>{{validationResult.lint.exitCode}}</td>
+    </tr>
+    <tr>
+      <td>Unit Tests</td>
+      <td>
+        {{#if validationResult.test.passed}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Green</ac:parameter>
+          <ac:parameter ac:name="title">PASSED</ac:parameter>
+        </ac:structured-macro>
+        {{else}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Red</ac:parameter>
+          <ac:parameter ac:name="title">FAILED</ac:parameter>
+        </ac:structured-macro>
+        {{/if}}
+      </td>
+      <td>{{validationResult.test.exitCode}}</td>
+    </tr>
+    <tr>
+      <td>Production Build</td>
+      <td>
+        {{#if validationResult.build.passed}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Green</ac:parameter>
+          <ac:parameter ac:name="title">PASSED</ac:parameter>
+        </ac:structured-macro>
+        {{else}}
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">Red</ac:parameter>
+          <ac:parameter ac:name="title">FAILED</ac:parameter>
+        </ac:structured-macro>
+        {{/if}}
+      </td>
+      <td>{{validationResult.build.exitCode}}</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>🔗 Related Links</h2>
+
+<ul>
+  <li><strong>Pull Request:</strong> <a href="{{prUrl}}">View PR #{{prNumber}}</a></li>
+  <li><strong>Branch:</strong> <code>{{branchName}}</code></li>
+  <li><strong>Repository:</strong> {{githubRepo}}</li>
+</ul>
+
+<hr/>
+
+<p><em>Generated automatically by n8n workflow on {{timestamp}}</em></p>
