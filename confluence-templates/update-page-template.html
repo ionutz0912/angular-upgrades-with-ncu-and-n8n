@@ -2,7 +2,7 @@
 
 <ac:structured-macro ac:name="info">
   <ac:rich-text-body>
-    <p><strong>Automated dependency update executed by n8n workflow</strong></p>
+    <p><strong>Automated dependency update executed by n8n workflow with AI-powered error resolution</strong></p>
   </ac:rich-text-body>
 </ac:structured-macro>
 
@@ -28,6 +28,15 @@
     <tr>
       <td><strong>Total Updates</strong></td>
       <td>{{totalUpdates}}</td>
+    </tr>
+    <tr>
+      <td><strong>npm Install Status</strong></td>
+      <td>
+        <ac:structured-macro ac:name="status">
+          <ac:parameter ac:name="colour">{{npmInstallColor}}</ac:parameter>
+          <ac:parameter ac:name="title">{{npmInstallStatus}}</ac:parameter>
+        </ac:structured-macro>
+      </td>
     </tr>
     <tr>
       <td><strong>AI Fixes Applied</strong></td>
@@ -80,12 +89,58 @@
   </tbody>
 </table>
 
-{{#if hasErrors}}
-<h2>⚠️ Errors Encountered</h2>
+{{#if hasInstallErrors}}
+<h2>⚠️ npm Install Errors Encountered</h2>
 
 <ac:structured-macro ac:name="warning">
   <ac:rich-text-body>
-    <p>Errors were detected during testing and build. AI-powered fixes were applied.</p>
+    <p>Dependency conflicts were detected during npm install. AI-powered fixes were automatically applied.</p>
+  </ac:rich-text-body>
+</ac:structured-macro>
+
+<h3>Dependency Conflict Errors</h3>
+<ac:structured-macro ac:name="code">
+  <ac:parameter ac:name="language">bash</ac:parameter>
+  <ac:parameter ac:name="title">npm install errors</ac:parameter>
+  <ac:plain-text-body><![CDATA[
+{{installErrors}}
+  ]]></ac:plain-text-body>
+</ac:structured-macro>
+
+<h2>🤖 AI-Generated Solutions for npm Install</h2>
+
+<p><strong>Claude Analysis:</strong> {{claudeAnalysis}}</p>
+
+{{#each installFixes}}
+<h3>Fix {{@index}}: {{this.file}}</h3>
+<p><strong>Reason:</strong> {{this.reason}}</p>
+
+<ac:structured-macro ac:name="code">
+  <ac:parameter ac:name="language">json</ac:parameter>
+  <ac:parameter ac:name="title">{{this.file}}</ac:parameter>
+  <ac:plain-text-body><![CDATA[
+{{this.content}}
+  ]]></ac:plain-text-body>
+</ac:structured-macro>
+{{/each}}
+
+<h3>Resolution Strategy</h3>
+<p>Common solutions applied:</p>
+<ul>
+  <li>Updated peer dependency ranges to resolve conflicts</li>
+  <li>Added package resolutions to package.json</li>
+  <li>Used --legacy-peer-deps flag where appropriate</li>
+  <li>Aligned conflicting dependency versions</li>
+</ul>
+
+{{/if}}
+
+{{#if hasTestErrors}}
+<h2>⚠️ Test & Build Errors</h2>
+
+<ac:structured-macro ac:name="info">
+  <ac:rich-text-body>
+    <p>Test or build errors detected after successful npm install.</p>
   </ac:rich-text-body>
 </ac:structured-macro>
 
@@ -106,21 +161,6 @@
 {{buildErrors}}
   ]]></ac:plain-text-body>
 </ac:structured-macro>
-
-<h2>🤖 AI-Generated Solutions</h2>
-
-{{#each fixes}}
-<h3>Fix {{@index}}: {{this.file}}</h3>
-<p><strong>Reason:</strong> {{this.reason}}</p>
-
-<ac:structured-macro ac:name="code">
-  <ac:parameter ac:name="language">typescript</ac:parameter>
-  <ac:parameter ac:name="title">{{this.file}}</ac:parameter>
-  <ac:plain-text-body><![CDATA[
-{{this.content}}
-  ]]></ac:plain-text-body>
-</ac:structured-macro>
-{{/each}}
 
 {{/if}}
 

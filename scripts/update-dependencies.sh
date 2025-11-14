@@ -51,13 +51,32 @@ UPDATE_COUNT=$(echo "$UPGRADES" | jq 'length')
 # Create detailed report
 ncu --format group > /tmp/ncu-report.txt 2>&1 || echo "No updates available" > /tmp/ncu-report.txt
 
+# Convert upgrades object to array format for easier consumption
+# Format: [{name: "package", from: "1.0.0", to: "2.0.0"}]
+UPGRADES_ARRAY=$(echo "$UPGRADES" | jq -r 'to_entries | map({name: .key, to: .value}) | .[]' | \
+  jq -s '.' | \
+  jq --argjson current "$CURRENT_VERSIONS" '
+    map(
+      . as $upgrade |
+      {
+        name: .name,
+        from: (
+          ($current.dependencies // {})[$upgrade.name] //
+          ($current.devDependencies // {})[$upgrade.name] //
+          "unknown"
+        ),
+        to: .to
+      }
+    )
+  ')
+
 # Create comprehensive JSON output
 cat > "$OUTPUT_FILE" <<EOF
 {
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "projectPath": "$PROJECT_PATH",
   "currentVersions": $CURRENT_VERSIONS,
-  "upgrades": $UPGRADES,
+  "upgrades": $UPGRADES_ARRAY,
   "totalUpdates": $UPDATE_COUNT,
   "hasUpdates": $([ $UPDATE_COUNT -gt 0 ] && echo "true" || echo "false"),
   "detailedReport": $(cat /tmp/ncu-report.txt | jq -Rs .)

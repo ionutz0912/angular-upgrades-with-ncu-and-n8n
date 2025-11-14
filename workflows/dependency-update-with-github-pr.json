@@ -1,0 +1,721 @@
+{
+  "name": "Angular Dependency Update with GitHub PR",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /Users/pato/github/ionutz0912/angular-test-project && git checkout -b test-deps-update_$(date +%m-%d-%Y_%I-%M-%S_%p)"
+      },
+      "id": "create-branch",
+      "name": "Create Test Branch",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/update-dependencies.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/ncu-test.json"
+      },
+      "id": "check-updates",
+      "name": "Check for Updates",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst data = JSON.parse(output);\n\nreturn {\n  json: {\n    hasUpdates: data.hasUpdates,\n    totalUpdates: data.totalUpdates,\n    updates: data.upgrades,\n    projectPath: data.projectPath\n  }\n};"
+      },
+      "id": "parse-updates",
+      "name": "Parse Updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasUpdates}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-updates",
+      "name": "Has Updates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /Users/pato/github/ionutz0912/angular-test-project && ncu -u"
+      },
+      "id": "apply-updates",
+      "name": "Apply Updates to package.json",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /Users/pato/github/ionutz0912/angular-test-project && git add package.json && git commit -m \"Update package.json - $(date +%Y-%m-%d)\""
+      },
+      "id": "commit-package-json",
+      "name": "Commit package.json",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/npm-install-with-capture.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/install-results.json"
+      },
+      "id": "npm-install",
+      "name": "Run npm install",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        200
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "command": "cat /tmp/install-results.json"
+      },
+      "id": "read-install-results",
+      "name": "Read Install Results",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst data = JSON.parse(output);\n\nreturn {\n  json: {\n    status: data.status,\n    hasErrors: data.hasErrors,\n    installPassed: data.install.passed,\n    installExitCode: data.install.exitCode,\n    dependencyErrors: data.install.dependencyErrors,\n    fullOutput: data.install.output\n  }\n};"
+      },
+      "id": "parse-install-results",
+      "name": "Parse Install Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1850,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasErrors}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-install-errors",
+      "name": "Install Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare error context for Claude\nconst errors = $input.first().json.dependencyErrors;\nconst fullOutput = $input.first().json.fullOutput;\n\n// Create a temporary file with the errors\nconst errorContext = `npm install failed with the following dependency conflicts:\n\n${errors}\n\nFull output:\n${fullOutput}\n\nPlease analyze these dependency conflicts and provide fixes. Common solutions:\n1. Use --legacy-peer-deps flag\n2. Update conflicting peer dependencies\n3. Add resolutions to package.json\n4. Update package versions to compatible ranges\n`;\n\nreturn {\n  json: {\n    errorContext: errorContext,\n    errors: errors\n  }\n};"
+      },
+      "id": "prepare-claude-context",
+      "name": "Prepare Error Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "echo \"={{$json.errorContext}}\" > /tmp/install-errors.txt"
+      },
+      "id": "save-error-context",
+      "name": "Save Error Context",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2450,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/apply-claude-fix.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/install-errors.txt $CLAUDE_API_KEY /tmp/claude-fixes.json"
+      },
+      "id": "call-claude",
+      "name": "Get Claude Fixes",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2650,
+        100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "command": "cat /tmp/claude-fixes.json"
+      },
+      "id": "read-claude-response",
+      "name": "Read Claude Response",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2750,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst data = JSON.parse(output);\n\nreturn {\n  json: {\n    fixes: data.fixes || [],\n    fixCount: (data.fixes || []).length,\n    claudeAnalysis: data.analysis || 'No analysis provided'\n  }\n};"
+      },
+      "id": "parse-claude-response",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2850,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/apply-file-fixes.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/claude-fixes.json"
+      },
+      "id": "apply-fixes",
+      "name": "Apply Claude Fixes",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3050,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "cd /Users/pato/github/ionutz0912/angular-test-project && git add . && git commit -m \"Apply Claude AI fix for npm install errors - $(date +%Y-%m-%d)\""
+      },
+      "id": "commit-fixes",
+      "name": "Commit Fixes",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/npm-install-with-capture.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/install-retry.json"
+      },
+      "id": "retry-install",
+      "name": "Retry npm install",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3450,
+        100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "command": "cat /tmp/install-retry.json"
+      },
+      "id": "read-retry-results",
+      "name": "Read Retry Results",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3550,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst data = JSON.parse(output);\n\nreturn {\n  json: {\n    installPassed: data.install.passed,\n    message: data.install.passed ? 'npm install succeeded after fixes!' : 'npm install still failing',\n    status: data.status\n  }\n};"
+      },
+      "id": "check-retry-result",
+      "name": "Check Retry Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3650,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/run-tests.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/test-results.json"
+      },
+      "id": "run-tests",
+      "name": "Run Tests & Build",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "command": "cat /tmp/test-results.json"
+      },
+      "id": "read-test-results",
+      "name": "Read Test Results",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2350,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\nconst data = JSON.parse(output);\n\nreturn {\n  json: {\n    testPassed: data.test.passed,\n    buildPassed: data.build.passed,\n    summary: `Tests: ${data.test.passed ? 'PASSED \u2713' : 'FAILED \u2717'} | Build: ${data.build.passed ? 'PASSED \u2713' : 'FAILED \u2717'}`\n  }\n};"
+      },
+      "id": "parse-test-results",
+      "name": "Parse Test Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    message: \"No updates available\",\n    totalUpdates: 0\n  }\n};"
+      },
+      "id": "no-updates",
+      "name": "No Updates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get branch name from earlier in workflow\nconst branchOutput = $('Create Test Branch').first().json.stdout;\nconst branchMatch = branchOutput.match(/Switched to a new branch '([^']+)'/);\nlet branchName = branchMatch ? branchMatch[1] : 'test-deps-update';\n\n// If branch match failed, try to extract from stderr\nif (!branchMatch) {\n  const stderrOutput = $('Create Test Branch').first().json.stderr || '';\n  const stderrMatch = stderrOutput.match(/Switched to a new branch '([^']+)'/);\n  if (stderrMatch) {\n    branchName = stderrMatch[1];\n  }\n}\n\n// Get update info\nconst updateInfo = $('Parse Updates').first().json;\nconst testResults = $input.first().json;\n\n// Build PR title\nconst title = `Update Angular Dependencies - ${updateInfo.totalUpdates} packages (${new Date().toISOString().split('T')[0]})`;\n\n// Build PR body - handle updates array safely\nlet updateList = '';\nif (updateInfo.updates && Array.isArray(updateInfo.updates) && updateInfo.updates.length > 0) {\n  // Show first 10 updates, then indicate if there are more\n  const displayUpdates = updateInfo.updates.slice(0, 10);\n  updateList = displayUpdates.map(u =>\n    `- **${u.name}**: ${u.from} \u2192 ${u.to}`\n  ).join('\\n');\n\n  if (updateInfo.updates.length > 10) {\n    updateList += `\\n\\n...and ${updateInfo.updates.length - 10} more packages`;\n  }\n} else {\n  updateList = '_See commit for full list of dependency updates_';\n}\n\nconst body = `## \ud83d\udce6 Dependency Updates\n\nThis PR updates ${updateInfo.totalUpdates} packages to their latest versions.\n\n### Updates Applied\n${updateList}\n\n### Test Results\n| Check | Status |\n|-------|--------|\n| **Tests** | ${testResults.testPassed ? '\u2705 PASSED' : '\u274c FAILED'} |\n| **Build** | ${testResults.buildPassed ? '\u2705 PASSED' : '\u274c FAILED'} |\n\n### Details\n- **Branch**: \\`${branchName}\\`\n- **Generated**: ${new Date().toISOString()}\n- **Automated by**: n8n dependency update workflow\n\n---\n*This PR was automatically generated. Please review the changes before merging.*\n`;\n\nreturn {\n  json: {\n    title: title,\n    body: body,\n    branchName: branchName,\n    updateCount: updateInfo.totalUpdates\n  }\n};"
+      },
+      "id": "prepare-pr-data",
+      "name": "Prepare PR Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cat > /tmp/write-pr-data.sh << 'EOFSCRIPT'\n#!/bin/bash\ncat > /tmp/pr-data.json << 'EOFJSON'\n{{ JSON.stringify($json, null, 2) }}\nEOFJSON\nEOFSCRIPT\nchmod +x /tmp/write-pr-data.sh && /tmp/write-pr-data.sh"
+      },
+      "id": "save-pr-data",
+      "name": "Save PR Data JSON",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/create-github-pr.sh /Users/pato/github/ionutz0912/angular-test-project {{ $('Prepare PR Data').first().json.branchName }} /tmp/pr-data.json $GITHUB_TOKEN main"
+      },
+      "id": "create-github-pr",
+      "name": "Create GitHub PR",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4250,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout;\n\ntry {\n  const data = JSON.parse(output);\n\n  return {\n    json: {\n      success: data.success,\n      prExists: data.prExists || false,\n      prNumber: data.pr ? data.pr.number : null,\n      prUrl: data.pr ? data.pr.url : null,\n      prState: data.pr ? data.pr.state : null,\n      message: data.prExists ? 'PR already exists' : 'PR created successfully',\n      repository: data.repository || {},\n      timestamp: data.timestamp || new Date().toISOString()\n    }\n  };\n} catch (e) {\n  return {\n    json: {\n      success: false,\n      error: 'Failed to parse PR response',\n      rawOutput: output\n    }\n  };\n}"
+      },
+      "id": "parse-pr-response",
+      "name": "Parse PR Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4450,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Test Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Test Branch": {
+      "main": [
+        [
+          {
+            "node": "Check for Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Updates": {
+      "main": [
+        [
+          {
+            "node": "Parse Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Updates": {
+      "main": [
+        [
+          {
+            "node": "Has Updates?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Updates?": {
+      "main": [
+        [
+          {
+            "node": "Apply Updates to package.json",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Updates to package.json": {
+      "main": [
+        [
+          {
+            "node": "Commit package.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit package.json": {
+      "main": [
+        [
+          {
+            "node": "Run npm install",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run npm install": {
+      "main": [
+        [
+          {
+            "node": "Read Install Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Install Results": {
+      "main": [
+        [
+          {
+            "node": "Parse Install Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Install Results": {
+      "main": [
+        [
+          {
+            "node": "Install Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Install Failed?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run Tests & Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Context": {
+      "main": [
+        [
+          {
+            "node": "Save Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Error Context": {
+      "main": [
+        [
+          {
+            "node": "Get Claude Fixes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Claude Fixes": {
+      "main": [
+        [
+          {
+            "node": "Read Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Apply Claude Fixes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Claude Fixes": {
+      "main": [
+        [
+          {
+            "node": "Commit Fixes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit Fixes": {
+      "main": [
+        [
+          {
+            "node": "Retry npm install",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry npm install": {
+      "main": [
+        [
+          {
+            "node": "Read Retry Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Retry Results": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Result": {
+      "main": [
+        [
+          {
+            "node": "Run Tests & Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Tests & Build": {
+      "main": [
+        [
+          {
+            "node": "Read Test Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Test Results": {
+      "main": [
+        [
+          {
+            "node": "Parse Test Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Test Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare PR Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare PR Data": {
+      "main": [
+        [
+          {
+            "node": "Save PR Data JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save PR Data JSON": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub PR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub PR": {
+      "main": [
+        [
+          {
+            "node": "Parse PR Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-11-13T10:00:00.000Z",
+  "versionId": "1"
+}

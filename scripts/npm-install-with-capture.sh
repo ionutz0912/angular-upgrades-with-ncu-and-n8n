@@ -47,7 +47,12 @@ DEPENDENCY_ERRORS=$(extract_dependency_errors "$INSTALL_LOG")
 # Get full install output for context
 FULL_OUTPUT=$(cat "$INSTALL_LOG")
 
-# Determine status
+# Determine status and check for warnings even if install succeeded
+HAS_WARNINGS=false
+if [ -n "$DEPENDENCY_ERRORS" ] && [ "$DEPENDENCY_ERRORS" != "" ]; then
+    HAS_WARNINGS=true
+fi
+
 if [ $INSTALL_EXIT_CODE -eq 0 ]; then
     OVERALL_STATUS="success"
     HAS_ERRORS=false
@@ -63,6 +68,7 @@ cat > "$OUTPUT_FILE" <<EOF
   "projectPath": "$PROJECT_PATH",
   "status": "$OVERALL_STATUS",
   "hasErrors": $HAS_ERRORS,
+  "hasWarnings": $HAS_WARNINGS,
   "install": {
     "exitCode": $INSTALL_EXIT_CODE,
     "passed": $([ $INSTALL_EXIT_CODE -eq 0 ] && echo "true" || echo "false"),

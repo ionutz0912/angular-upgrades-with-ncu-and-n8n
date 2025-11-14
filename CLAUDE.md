@@ -9,22 +9,48 @@ This is an **n8n-based automation system** that automatically updates Angular pr
 ## Core Architecture
 
 ### Orchestration Layer
-- **Primary n8n workflow** (`workflows/dependency-update-workflow.json`): 25-node workflow that orchestrates the complete automation pipeline
-- **Key Feature**: Separates npm install error detection and fixes from test/build error handling
-- Executes on configurable schedule (cron expressions)
-- Handles npm install failures with Claude AI fix integration BEFORE running tests
+Four n8n workflows available for different use cases:
+
+1. **dependency-update-workflow.json** (25 nodes) - Core automation workflow
+   - Handles npm install error detection and fixes with Claude AI
+   - Executes on configurable schedule (cron expressions)
+   - Runs tests and builds after successful dependency installation
+   - Does NOT create GitHub PRs or Confluence docs (stops after validation)
+
+2. **dependency-update-with-github-pr.json** (29 nodes) - Automation with PR creation
+   - Includes all features from core workflow
+   - Automatically creates GitHub Pull Requests after successful validation
+   - Generates detailed PR descriptions with update summary and test results
+   - Pushes branch to remote and creates PR via GitHub API
+   - Does NOT create Confluence documentation
+
+3. **dependency-update-with-pr-and-confluence.json** (33 nodes) - Full automation with documentation
+   - Includes all features from PR workflow
+   - Automatically creates Confluence documentation page after PR creation
+   - Documents npm install errors and Claude AI solutions
+   - Links Confluence page to GitHub PR for complete traceability
+   - **RECOMMENDED for production use with full documentation**
+
+4. **main-dependency-update.json** (28 nodes) - Legacy workflow (reference only)
+   - Original workflow focusing on test/build error fixes
+   - Kept for reference and comparison
+
+**Key Features**:
+- Separates npm install error detection and fixes from test/build error handling
 - Smart retry logic with error context analysis
 - All execution state managed through n8n variables
 
 ### Execution Layer (Bash Scripts)
-Six core scripts in `scripts/` directory that handle actual operations:
+Eight core scripts in `scripts/` directory that handle actual operations:
 
 1. **update-dependencies.sh**: npm-check-updates wrapper with structured JSON output
-2. **npm-install-with-capture.sh**: npm install with ERESOLVE/peer dependency error capture (NEW)
+2. **npm-install-with-capture.sh**: npm install with ERESOLVE/peer dependency error capture
 3. **run-tests.sh**: Angular testing (ng test) + production build (ng build --configuration production)
 4. **apply-claude-fix.sh**: Claude API integration for error analysis and fix generation
 5. **apply-file-fixes.sh**: Applies Claude-generated fixes to project files
 6. **validate-changes.sh**: Final validation (lint + test + build)
+7. **create-github-pr.sh**: GitHub Pull Request creation via GitHub API
+8. **create-confluence-doc.sh**: Confluence documentation page creation via Confluence REST API
 
 All scripts follow same pattern:
 - Accept project path as first argument
@@ -93,12 +119,21 @@ chmod +x scripts/*.sh
 
 # Test final validation
 ./scripts/validate-changes.sh /path/to/project /tmp/validation.json
+
+# Test GitHub PR creation (requires GITHUB_TOKEN)
+./scripts/create-github-pr.sh /path/to/project branch-name /tmp/pr-data.json $GITHUB_TOKEN main
+
+# Test Confluence documentation creation (requires CONFLUENCE credentials in .env)
+./scripts/create-confluence-doc.sh /tmp/confluence-data.json /tmp/confluence-result.json
 ```
 
 ### Workflow Management
 
 ```bash
-# Import workflow: Use n8n UI → Import from File → workflows/dependency-update-workflow.json
+# Import workflow: Use n8n UI → Import from File → choose workflow file:
+#   - dependency-update-workflow.json (core automation, no PR or docs)
+#   - dependency-update-with-github-pr.json (automation with PR, no docs)
+#   - dependency-update-with-pr-and-confluence.json (RECOMMENDED: full automation with PR and docs)
 # Activate workflow: Toggle switch in n8n UI
 # Execute manually: Click "Execute Workflow" button
 # View execution history: n8n UI → Executions tab
@@ -133,7 +168,25 @@ chmod +x scripts/*.sh
 13. **Read Test Results** → Read JSON output from test script
 14. **Parse Test Results** → Extract test and build status
 
-**Note**: This workflow focuses on fixing npm install dependency conflicts with Claude AI BEFORE running tests/builds. The legacy `main-dependency-update.json` workflow handled test/build errors instead.
+**Additional steps for `dependency-update-with-github-pr.json` workflow:**
+
+15. **Prepare PR Data** → Collect branch name, update info, test results; format PR title and body
+16. **Save PR Data JSON** → Write PR data to temporary JSON file
+17. **Create GitHub PR** → Call create-github-pr.sh script to push branch and create PR via GitHub API
+18. **Parse PR Response** → Extract PR number, URL, and creation status
+
+**Additional steps for `dependency-update-with-pr-and-confluence.json` workflow (FULL AUTOMATION):**
+
+19. **Prepare Confluence Data** → Collect all workflow data (updates, install errors, Claude fixes, test results, PR info)
+20. **Save Confluence Data JSON** → Write comprehensive documentation data to temporary JSON file
+21. **Create Confluence Doc** → Call create-confluence-doc.sh script to create Confluence page via REST API
+22. **Parse Confluence Response** → Extract Confluence page ID, URL, and creation status
+
+**Note**:
+- The core workflow (`dependency-update-workflow.json`) stops after step 14
+- The PR workflow (`dependency-update-with-github-pr.json`) stops after step 18
+- The full automation workflow (`dependency-update-with-pr-and-confluence.json`) completes all 22 steps
+- The legacy `main-dependency-update.json` workflow handled test/build errors instead of npm install errors
 
 ## Key Design Patterns
 
@@ -159,7 +212,19 @@ chmod +x scripts/*.sh
 ### State Management
 - n8n workflow variables track: `currentRetry`, `maxRetries`, `runId`, `branchName`, `projectPath`
 - No persistent state between runs (stateless execution)
-- Each run creates new branch, new PR
+- Each run creates new branch, new PR, new Confluence page (if enabled)
+
+### Confluence Documentation Integration
+- Template: Uses Confluence Storage Format (HTML-like markup with macros)
+- Page creation: Automated via Confluence REST API
+- Content includes:
+  - Dependency update summary with version changes
+  - npm install errors and dependency conflicts
+  - Claude AI analysis and solutions applied
+  - Test and build validation results
+  - Links to GitHub PR and branch
+- Parent page: All update documentation appears as child pages under configured parent
+- Formatting: Status macros (color-coded), code blocks, structured tables
 
 ## Testing & Validation
 
@@ -267,19 +332,25 @@ To automate multiple Angular projects:
 
 ```
 ng-ncu-n8n/
-├── scripts/                           # Automation scripts (bash)
-│   ├── update-dependencies.sh         # NCU wrapper
-│   ├── npm-install-with-capture.sh    # npm install error capture
-│   ├── run-tests.sh                   # Test executor
-│   ├── apply-claude-fix.sh            # Claude API client
-│   ├── apply-file-fixes.sh            # Fix applicator
-│   └── validate-changes.sh            # Final validator
-├── workflows/                         # n8n workflows (JSON)
-│   ├── dependency-update-workflow.json # Primary workflow (npm install fixes)
-│   └── main-dependency-update.json    # Legacy workflow (reference)
-├── mcp-config/                        # Confluence MCP setup docs
-├── confluence-templates/              # Confluence page templates (HTML)
-├── docs/                              # Additional documentation
+├── scripts/                                        # Automation scripts (bash)
+│   ├── update-dependencies.sh                      # NCU wrapper
+│   ├── npm-install-with-capture.sh                 # npm install error capture
+│   ├── run-tests.sh                                # Test executor
+│   ├── apply-claude-fix.sh                         # Claude API client
+│   ├── apply-file-fixes.sh                         # Fix applicator
+│   ├── validate-changes.sh                         # Final validator
+│   ├── create-github-pr.sh                         # GitHub PR creator
+│   └── create-confluence-doc.sh                    # Confluence doc creator (NEW)
+├── workflows/                                      # n8n workflows (JSON)
+│   ├── dependency-update-workflow.json             # Core workflow (25 nodes, no PR or docs)
+│   ├── dependency-update-with-github-pr.json       # PR workflow (29 nodes, with PR)
+│   ├── dependency-update-with-pr-and-confluence.json # Full workflow (33 nodes, PR + Confluence) (NEW)
+│   └── main-dependency-update.json                 # Legacy workflow (reference)
+├── mcp-config/                                     # Confluence MCP setup docs
+├── confluence-templates/                           # Confluence page templates (HTML)
+│   └── update-page-template.html                   # Updated with npm install error docs (UPDATED)
+├── docs/                                           # Additional documentation
+│   └── CONFLUENCE-INTEGRATION-GUIDE.md             # Complete Confluence setup guide (NEW)
 ├── .env.example                       # Environment template
 ├── .env                               # Your configuration (gitignored)
 ├── package.json                       # n8n + CLI dependencies
@@ -303,11 +374,14 @@ ng-ncu-n8n/
 ✅ **FULLY TESTED AND PRODUCTION READY**
 
 ### Verified Components
-- All 6 automation scripts tested individually (including new npm-install-with-capture.sh)
+- All 7 automation scripts tested individually (including npm-install-with-capture.sh and create-github-pr.sh)
 - Full update cycle with npm install error handling working
-- n8n workflow execution successful (dependency-update-workflow.json - 25 nodes)
+- n8n workflow execution successful:
+  - dependency-update-workflow.json (25 nodes) - core automation
+  - dependency-update-with-github-pr.json (29 nodes) - with PR creation
 - All API integrations confirmed (Claude, GitHub, Confluence)
 - npm install dependency conflict detection and Claude AI fixes verified
+- GitHub PR creation via API verified (push branch + create PR)
 - Separated script execution and JSON reading (clean parsing, no errors)
 
 ### Key Configuration for Testing
@@ -322,11 +396,19 @@ export CHROME_BIN="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 npm install --legacy-peer-deps
 ```
 
-### Production Workflow
-**File**: `workflows/dependency-update-workflow.json`
-- 25 nodes orchestrating complete automation
-- Tested with Angular 19 → 20 upgrade (18 dependency updates)
+### Production Workflows
+**Core Workflow**: `workflows/dependency-update-workflow.json` (25 nodes)
 - Handles npm install dependency conflicts with Claude AI
+- Runs tests and builds, stops after validation
+- No GitHub PR creation
+
+**Full Workflow**: `workflows/dependency-update-with-github-pr.json` (29 nodes)
+- All features from core workflow
+- Automatically creates GitHub PRs with detailed descriptions
+- Pushes branch to remote and creates PR via GitHub API
+
+**Both workflows tested with:**
+- Angular 19 → 20 upgrade (18 dependency updates)
 - Successfully detects ERESOLVE errors, peer dependency conflicts
 - Clean JSON parsing with separated read operations
 - Safe to run in production
