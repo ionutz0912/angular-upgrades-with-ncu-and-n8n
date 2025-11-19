@@ -21,8 +21,8 @@ Automated Angular dependency updates using **npm-check-updates**, with **Claude 
 
 ### Current Version Features:
 - ✅ **Core workflow**: `workflows/dependency-update-workflow.json` (25 nodes) - npm install error fixes + validation
-- ✅ **PR workflow**: `workflows/dependency-update-with-github-pr.json` (29 nodes) - Core + automated PR creation
-- ✅ **Full workflow**: `workflows/dependency-update-with-pr-and-confluence.json` (33 nodes) - Core + PR + Confluence docs
+- ✅ **PR workflow**: `workflows/dependency-update-with-github-pr.json` (30 nodes) - Core + automated PR creation + branch checkout fix
+- ✅ **Full workflow**: `workflows/dependency-update-with-pr-and-confluence.json` (34 nodes) - Core + PR + Confluence docs + branch checkout fix
 - ✅ **npm install error detection**: `npm-install-with-capture.sh` script captures ERESOLVE and peer dependency conflicts
 - ✅ **Claude AI integration**: Automatically fixes npm install dependency conflicts BEFORE running tests/builds
 - ✅ **Intelligent error handling**: Separates npm install failures from test/build failures
@@ -32,8 +32,8 @@ Automated Angular dependency updates using **npm-check-updates**, with **Claude 
 
 ### Workflow Capabilities:
 - **Core workflow (25 nodes)**: Complete dependency update cycle without PR creation
-- **PR workflow (29 nodes)**: All core features + automatic GitHub PR generation
-- **Full workflow (33 nodes)**: All features + automatic Confluence documentation
+- **PR workflow (30 nodes)**: All core features + automatic GitHub PR generation with branch checkout fix
+- **Full workflow (34 nodes)**: All features + automatic Confluence documentation with branch checkout fix
 - Handles common Angular dependency conflicts (peer dependencies, version mismatches, TypeScript version conflicts)
 - Smart retry logic with Claude AI analysis between attempts
 - Clean JSON parsing with separated script execution and result reading
@@ -56,8 +56,8 @@ Automated Angular dependency updates using **npm-check-updates**, with **Claude 
 
 **Available Workflows**:
 - `workflows/dependency-update-workflow.json` (25 nodes) - Core automation
-- `workflows/dependency-update-with-github-pr.json` (29 nodes) - Core + PR
-- `workflows/dependency-update-with-pr-and-confluence.json` (33 nodes) - **Full automation** (RECOMMENDED)
+- `workflows/dependency-update-with-github-pr.json` (30 nodes) - Core + PR + branch fix
+- `workflows/dependency-update-with-pr-and-confluence.json` (34 nodes) - **Full automation** (RECOMMENDED)
 
 **Branch Naming Format**: `test-deps-update_MM-DD-YYYY_HH-MM-SS_AM/PM`
 

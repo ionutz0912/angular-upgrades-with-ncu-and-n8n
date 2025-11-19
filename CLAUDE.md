@@ -17,15 +17,17 @@ Four n8n workflows available for different use cases:
    - Runs tests and builds after successful dependency installation
    - Does NOT create GitHub PRs or Confluence docs (stops after validation)
 
-2. **dependency-update-with-github-pr.json** (29 nodes) - Automation with PR creation
+2. **dependency-update-with-github-pr.json** (30 nodes) - Automation with PR creation
    - Includes all features from core workflow
    - Automatically creates GitHub Pull Requests after successful validation
+   - **NEW**: Explicit branch checkout before PR creation (fixes intermittent failures)
    - Generates detailed PR descriptions with update summary and test results
    - Pushes branch to remote and creates PR via GitHub API
    - Does NOT create Confluence documentation
 
-3. **dependency-update-with-pr-and-confluence.json** (33 nodes) - Full automation with documentation
+3. **dependency-update-with-pr-and-confluence.json** (34 nodes) - Full automation with documentation
    - Includes all features from PR workflow
+   - **NEW**: Explicit branch checkout before PR creation (fixes intermittent failures)
    - Automatically creates Confluence documentation page after PR creation
    - Documents npm install errors and Claude AI solutions
    - Links Confluence page to GitHub PR for complete traceability
@@ -39,6 +41,7 @@ Four n8n workflows available for different use cases:
 - Separates npm install error detection and fixes from test/build error handling
 - Smart retry logic with error context analysis
 - All execution state managed through n8n variables
+- **Branch checkout fix (2025-11-18)**: Explicit branch verification before PR creation eliminates intermittent failures
 
 ### Execution Layer (Bash Scripts)
 Eight core scripts in `scripts/` directory that handle actual operations:
