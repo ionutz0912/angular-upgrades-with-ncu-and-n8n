@@ -370,6 +370,20 @@
     },
     {
       "parameters": {
+        "command": "=cd /Users/pato/github/ionutz0912/angular-test-project && git checkout {{ $('Prepare PR Data').first().json.branchName }}"
+      },
+      "id": "checkout-pr-branch",
+      "name": "Checkout PR Branch",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4150,
+        300
+      ],
+      "continueOnFail": false
+    },
+    {
+      "parameters": {
         "command": "=/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/create-github-pr.sh /Users/pato/github/ionutz0912/angular-test-project {{ $('Prepare PR Data').first().json.branchName }} /tmp/pr-data.json $GITHUB_TOKEN main"
       },
       "id": "create-github-pr",
@@ -377,7 +391,7 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        4250,
+        4350,
         300
       ],
       "continueOnFail": true
@@ -687,6 +701,17 @@
       ]
     },
     "Save PR Data JSON": {
+      "main": [
+        [
+          {
+            "node": "Checkout PR Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkout PR Branch": {
       "main": [
         [
           {
