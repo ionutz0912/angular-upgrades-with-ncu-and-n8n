@@ -185,10 +185,10 @@
     },
     {
       "parameters": {
-        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/apply-claude-fix.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/install-errors.txt $CLAUDE_API_KEY /tmp/claude-fixes.json"
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/apply-ai-fix.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/install-errors.txt /tmp/ai-fixes.json"
       },
-      "id": "call-claude",
-      "name": "Get Claude Fixes",
+      "id": "call-ai",
+      "name": "Get AI Fixes",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
@@ -199,10 +199,10 @@
     },
     {
       "parameters": {
-        "command": "cat /tmp/claude-fixes.json"
+        "command": "cat /tmp/ai-fixes.json"
       },
-      "id": "read-claude-response",
-      "name": "Read Claude Response",
+      "id": "read-ai-response",
+      "name": "Read AI Response",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
@@ -214,8 +214,8 @@
       "parameters": {
         "jsCode": "const output = $input.first().json.stdout;\nconst data = JSON.parse(output);\n\nreturn {\n  json: {\n    fixes: data.fixes || [],\n    fixCount: (data.fixes || []).length,\n    claudeAnalysis: data.analysis || 'No analysis provided'\n  }\n};"
       },
-      "id": "parse-claude-response",
-      "name": "Parse Claude Response",
+      "id": "parse-ai-response",
+      "name": "Parse AI Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -225,10 +225,10 @@
     },
     {
       "parameters": {
-        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/apply-file-fixes.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/claude-fixes.json"
+        "command": "/Users/pato/github/ionutz0912/ng-ncu-n8n/scripts/apply-file-fixes.sh /Users/pato/github/ionutz0912/angular-test-project /tmp/ai-fixes.json"
       },
       "id": "apply-fixes",
-      "name": "Apply Claude Fixes",
+      "name": "Apply AI Fixes",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
@@ -238,7 +238,7 @@
     },
     {
       "parameters": {
-        "command": "cd /Users/pato/github/ionutz0912/angular-test-project && git add . && git commit -m \"Apply Claude AI fix for npm install errors - $(date +%Y-%m-%d)\""
+        "command": "cd /Users/pato/github/ionutz0912/angular-test-project && git add . && git commit -m \"Apply AI fix for npm install errors - $(date +%Y-%m-%d)\""
       },
       "id": "commit-fixes",
       "name": "Commit Fixes",
@@ -647,14 +647,14 @@
       "main": [
         [
           {
-            "node": "Apply Claude Fixes",
+            "node": "Apply AI Fixes",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Apply Claude Fixes": {
+    "Apply AI Fixes": {
       "main": [
         [
           {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an **n8n-based automation system** that automatically updates Angular project dependencies using npm-check-updates, with Claude AI-powered error fixing and Confluence documentation. The system runs locally (no Docker), orchestrates updates via bash scripts, and creates pull requests with comprehensive documentation.
+This is an **n8n-based automation system** that automatically updates Angular project dependencies using npm-check-updates, with **multi-provider AI-powered error fixing** (Claude, OpenAI, or GitHub Copilot) and Confluence documentation. The system runs locally (no Docker), orchestrates updates via bash scripts, and creates pull requests with comprehensive documentation.
 
 ## Core Architecture
 
@@ -12,7 +12,7 @@ This is an **n8n-based automation system** that automatically updates Angular pr
 Four n8n workflows available for different use cases:
 
 1. **dependency-update-workflow.json** (25 nodes) - Core automation workflow
-   - Handles npm install error detection and fixes with Claude AI
+   - Handles npm install error detection and fixes with AI (Claude/OpenAI/Copilot)
    - Executes on configurable schedule (cron expressions)
    - Runs tests and builds after successful dependency installation
    - Does NOT create GitHub PRs or Confluence docs (stops after validation)
@@ -29,7 +29,7 @@ Four n8n workflows available for different use cases:
    - Includes all features from PR workflow
    - **NEW**: Explicit branch checkout before PR creation (fixes intermittent failures)
    - Automatically creates Confluence documentation page after PR creation
-   - Documents npm install errors and Claude AI solutions
+   - Documents npm install errors and AI solutions
    - Links Confluence page to GitHub PR for complete traceability
    - **RECOMMENDED for production use with full documentation**
 
@@ -44,16 +44,17 @@ Four n8n workflows available for different use cases:
 - **Branch checkout fix (2025-11-18)**: Explicit branch verification before PR creation eliminates intermittent failures
 
 ### Execution Layer (Bash Scripts)
-Eight core scripts in `scripts/` directory that handle actual operations:
+Nine core scripts in `scripts/` directory that handle actual operations:
 
 1. **update-dependencies.sh**: npm-check-updates wrapper with structured JSON output
 2. **npm-install-with-capture.sh**: npm install with ERESOLVE/peer dependency error capture
 3. **run-tests.sh**: Angular testing (ng test) + production build (ng build --configuration production)
-4. **apply-claude-fix.sh**: Claude API integration for error analysis and fix generation
-5. **apply-file-fixes.sh**: Applies Claude-generated fixes to project files
-6. **validate-changes.sh**: Final validation (lint + test + build)
-7. **create-github-pr.sh**: GitHub Pull Request creation via GitHub API
-8. **create-confluence-doc.sh**: Confluence documentation page creation via Confluence REST API
+4. **apply-ai-fix.sh**: **Multi-provider AI integration** (Claude/OpenAI/Copilot) for error analysis and fix generation
+5. **apply-claude-fix.sh**: Legacy Claude-only API integration (kept for backward compatibility)
+6. **apply-file-fixes.sh**: Applies AI-generated fixes to project files
+7. **validate-changes.sh**: Final validation (lint + test + build)
+8. **create-github-pr.sh**: GitHub Pull Request creation via GitHub API
+9. **create-confluence-doc.sh**: Confluence documentation page creation via Confluence REST API
 
 All scripts follow same pattern:
 - Accept project path as first argument
@@ -63,16 +64,29 @@ All scripts follow same pattern:
 
 ### Integration Layer
 - **GitHub API**: Pull request creation via workflow HTTP requests
-- **Claude API**: Error fixing using Anthropic API (model: claude-sonnet-4-5)
+- **AI Provider APIs**: Multi-provider error fixing support
+  - **Claude (Anthropic)**: Default provider using claude-sonnet-4-5
+  - **OpenAI**: GPT-4-Turbo, GPT-4o, GPT-3.5-Turbo support
+  - **GitHub Copilot**: Via GitHub Models API (gpt-4o, o1-preview, etc.)
 - **Confluence API** (optional): Documentation via MCP integration
 
 ## Environment Configuration
 
 All configuration in `.env` file (see `.env.example` for template):
 
-**Critical variables:**
+**AI Provider Configuration (choose one):**
+- `AI_PROVIDER`: Explicit provider selection (`claude`, `openai`, or `copilot`). If not set, auto-detects based on available API keys.
 - `CLAUDE_API_KEY`: Anthropic API key (format: sk-ant-api03-...)
-- `GITHUB_TOKEN`: Personal access token with repo scope
+- `OPENAI_API_KEY`: OpenAI API key (format: sk-...)
+- `GITHUB_TOKEN`: Also used for GitHub Copilot via GitHub Models API
+
+**Model Selection (optional):**
+- `CLAUDE_MODEL`: Default `claude-sonnet-4-5` (options: claude-opus-4, claude-haiku-4)
+- `OPENAI_MODEL`: Default `gpt-4-turbo` (options: gpt-4o, gpt-4o-mini, gpt-4, gpt-3.5-turbo)
+- `COPILOT_MODEL`: Default `gpt-4o` (options: gpt-4o-mini, o1-preview, o1-mini)
+
+**Critical variables:**
+- `GITHUB_TOKEN`: Personal access token with repo scope (also used for Copilot)
 - `GITHUB_REPO_OWNER`, `GITHUB_REPO_NAME`: Target repository
 - `DEFAULT_PROJECT_PATH`: Absolute path to Angular project to monitor
 
@@ -114,7 +128,14 @@ chmod +x scripts/*.sh
 # Test running tests and build
 ./scripts/run-tests.sh /path/to/project /tmp/results.json
 
-# Test Claude API integration
+# Test multi-provider AI integration (auto-detects provider from env)
+./scripts/apply-ai-fix.sh /path/to/project /tmp/errors.txt /tmp/fixes.json
+
+# Or explicitly set provider:
+AI_PROVIDER=openai ./scripts/apply-ai-fix.sh /path/to/project /tmp/errors.txt /tmp/fixes.json
+AI_PROVIDER=copilot ./scripts/apply-ai-fix.sh /path/to/project /tmp/errors.txt /tmp/fixes.json
+
+# Legacy Claude-only script (backward compatible)
 ./scripts/apply-claude-fix.sh /path/to/project /tmp/errors.txt $CLAUDE_API_KEY /tmp/fixes.json
 
 # Test applying fixes
@@ -200,16 +221,33 @@ chmod +x scripts/*.sh
 - **Separated read operations**: Scripts write to files, separate nodes read JSON to avoid parsing errors
 - npm install errors captured with detailed dependency conflict information
 
-### Claude API Integration
+### Multi-Provider AI Integration
+The system supports three AI providers for error analysis and fix generation:
+
+**Provider Selection** (in order of auto-detection priority):
+1. **Claude (Anthropic)**: If `CLAUDE_API_KEY` is set
+2. **OpenAI**: If `OPENAI_API_KEY` is set
+3. **GitHub Copilot**: If `GITHUB_TOKEN` is set (uses GitHub Models API)
+
+**Configuration**:
+- Set `AI_PROVIDER=claude|openai|copilot` to explicitly choose provider
+- Or let the system auto-detect based on available API keys
+- Model selection via `CLAUDE_MODEL`, `OPENAI_MODEL`, or `COPILOT_MODEL`
+
+**Common Format** (all providers):
 - Prompt format: Structured request with error context
 - Response format: JSON array of file fixes
 - Each fix contains: `file` (path), `action` (update), `content` (full file), `reason` (explanation)
-- API model configurable via `CLAUDE_MODEL` env var
+
+**API Endpoints**:
+- Claude: `https://api.anthropic.com/v1/messages`
+- OpenAI: `https://api.openai.com/v1/chat/completions`
+- Copilot: `https://models.inference.ai.azure.com/chat/completions`
 
 ### Git Workflow
 - Feature branches: `dependency-update-{timestamp}`
 - Bot identity: Uses `GIT_USER_NAME` and `GIT_USER_EMAIL` from .env
-- Commit messages: Descriptive with context ("Update dependencies", "Apply Claude AI fix - Iteration 1")
+- Commit messages: Descriptive with context ("Update dependencies", "Apply AI fix - Iteration 1")
 - PR creation: Automated with detailed body including changes, errors, and solutions
 
 ### State Management
@@ -223,7 +261,7 @@ chmod +x scripts/*.sh
 - Content includes:
   - Dependency update summary with version changes
   - npm install errors and dependency conflicts
-  - Claude AI analysis and solutions applied
+  - AI analysis and solutions applied (with provider name)
   - Test and build validation results
   - Links to GitHub PR and branch
 - Parent page: All update documentation appears as child pages under configured parent
@@ -234,7 +272,7 @@ chmod +x scripts/*.sh
 ### Test Strategy
 1. **Pre-update**: Check git status (must be clean)
 2. **Post-update**: Run tests and build
-3. **Post-fix**: Re-run tests after each Claude fix attempt
+3. **Post-fix**: Re-run tests after each AI fix attempt
 4. **Final validation**: Comprehensive lint + test + build
 
 ### Angular Test Configuration
@@ -280,14 +318,31 @@ export NODE_PATH=$(pwd)
 chmod +x scripts/*.sh
 ```
 
-### Claude API Errors
-Test API key directly:
+### AI Provider API Errors
+
+**Test Claude API:**
 ```bash
 curl -X POST https://api.anthropic.com/v1/messages \
   -H "x-api-key: $CLAUDE_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
   -d '{"model":"claude-sonnet-4-5","max_tokens":100,"messages":[{"role":"user","content":"test"}]}'
+```
+
+**Test OpenAI API:**
+```bash
+curl -X POST https://api.openai.com/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{"model":"gpt-4-turbo","max_tokens":100,"messages":[{"role":"user","content":"test"}]}'
+```
+
+**Test GitHub Copilot API:**
+```bash
+curl -X POST https://models.inference.ai.azure.com/chat/completions \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"model":"gpt-4o","max_tokens":100,"messages":[{"role":"user","content":"test"}]}'
 ```
 
 ### Git Push Failures
@@ -339,11 +394,12 @@ ng-ncu-n8n/
 │   ├── update-dependencies.sh                      # NCU wrapper
 │   ├── npm-install-with-capture.sh                 # npm install error capture
 │   ├── run-tests.sh                                # Test executor
-│   ├── apply-claude-fix.sh                         # Claude API client
+│   ├── apply-ai-fix.sh                             # Multi-provider AI client (Claude/OpenAI/Copilot) (NEW)
+│   ├── apply-claude-fix.sh                         # Legacy Claude-only API client
 │   ├── apply-file-fixes.sh                         # Fix applicator
 │   ├── validate-changes.sh                         # Final validator
 │   ├── create-github-pr.sh                         # GitHub PR creator
-│   └── create-confluence-doc.sh                    # Confluence doc creator (NEW)
+│   └── create-confluence-doc.sh                    # Confluence doc creator
 ├── workflows/                                      # n8n workflows (JSON)
 │   ├── dependency-update-workflow.json             # Core workflow (25 nodes, no PR or docs)
 │   ├── dependency-update-with-github-pr.json       # PR workflow (29 nodes, with PR)
@@ -369,21 +425,22 @@ ng-ncu-n8n/
 - Scripts are designed to be idempotent where possible
 - All operations are logged to n8n execution history
 - Workflow JSON can be exported/imported for backup or sharing
-- Claude API calls are synchronous (n8n waits for response)
+- AI API calls are synchronous (n8n waits for response)
 - No database or persistent storage required
 
-## Testing Status (2025-11-13)
+## Testing Status (2025-11-24)
 
 ✅ **FULLY TESTED AND PRODUCTION READY**
 
 ### Verified Components
-- All 7 automation scripts tested individually (including npm-install-with-capture.sh and create-github-pr.sh)
+- All 9 automation scripts tested individually (including apply-ai-fix.sh multi-provider support)
 - Full update cycle with npm install error handling working
 - n8n workflow execution successful:
   - dependency-update-workflow.json (25 nodes) - core automation
   - dependency-update-with-github-pr.json (29 nodes) - with PR creation
-- All API integrations confirmed (Claude, GitHub, Confluence)
-- npm install dependency conflict detection and Claude AI fixes verified
+- All API integrations confirmed (Claude, OpenAI, GitHub Copilot, GitHub, Confluence)
+- Multi-provider AI fix generation verified (auto-detection + explicit selection)
+- npm install dependency conflict detection and AI fixes verified
 - GitHub PR creation via API verified (push branch + create PR)
 - Separated script execution and JSON reading (clean parsing, no errors)
 
@@ -401,7 +458,7 @@ npm install --legacy-peer-deps
 
 ### Production Workflows
 **Core Workflow**: `workflows/dependency-update-workflow.json` (25 nodes)
-- Handles npm install dependency conflicts with Claude AI
+- Handles npm install dependency conflicts with AI (Claude/OpenAI/Copilot)
 - Runs tests and builds, stops after validation
 - No GitHub PR creation
 
@@ -413,6 +470,7 @@ npm install --legacy-peer-deps
 **Both workflows tested with:**
 - Angular 19 → 20 upgrade (18 dependency updates)
 - Successfully detects ERESOLVE errors, peer dependency conflicts
+- Multi-provider AI support (Claude, OpenAI, GitHub Copilot)
 - Clean JSON parsing with separated read operations
 - Safe to run in production
 

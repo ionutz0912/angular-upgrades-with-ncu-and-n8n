@@ -207,7 +207,7 @@
     },
     {
       "parameters": {
-        "command": "={{$env.NODE_PATH}}/scripts/apply-claude-fix.sh {{$json.projectPath}} {{$json.errorFile}} {{$env.CLAUDE_API_KEY}} /tmp/claude-fix-{{$json.runId}}.json",
+        "command": "={{$env.NODE_PATH}}/scripts/apply-ai-fix.sh {{$json.projectPath}} {{$json.errorFile}} /tmp/ai-fix-{{$json.runId}}.json",
         "options": {}
       },
       "id": "call-claude-api",
@@ -231,7 +231,7 @@
     },
     {
       "parameters": {
-        "command": "={{$env.NODE_PATH}}/scripts/apply-file-fixes.sh {{$json.projectPath}} /tmp/claude-fix-{{$json.runId}}.json",
+        "command": "={{$env.NODE_PATH}}/scripts/apply-file-fixes.sh {{$json.projectPath}} /tmp/ai-fix-{{$json.runId}}.json",
         "options": {}
       },
       "id": "apply-fixes",
