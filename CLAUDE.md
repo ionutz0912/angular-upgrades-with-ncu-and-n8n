@@ -335,7 +335,7 @@ To automate multiple Angular projects:
 
 ```
 ng-ncu-n8n/
-├── scripts/                                        # Automation scripts (bash)
+├── scripts/                                        # Production automation scripts (bash)
 │   ├── update-dependencies.sh                      # NCU wrapper
 │   ├── npm-install-with-capture.sh                 # npm install error capture
 │   ├── run-tests.sh                                # Test executor
@@ -343,23 +343,29 @@ ng-ncu-n8n/
 │   ├── apply-file-fixes.sh                         # Fix applicator
 │   ├── validate-changes.sh                         # Final validator
 │   ├── create-github-pr.sh                         # GitHub PR creator
-│   └── create-confluence-doc.sh                    # Confluence doc creator (NEW)
+│   └── create-confluence-doc.sh                    # Confluence doc creator
+├── dev-tools/                                      # Development/testing utilities
+│   ├── test-confluence-integration.sh              # Confluence API test script
+│   └── cleanup-confluence-test-pages.sh            # Test page cleanup utility
 ├── workflows/                                      # n8n workflows (JSON)
 │   ├── dependency-update-workflow.json             # Core workflow (25 nodes, no PR or docs)
-│   ├── dependency-update-with-github-pr.json       # PR workflow (29 nodes, with PR)
-│   ├── dependency-update-with-pr-and-confluence.json # Full workflow (33 nodes, PR + Confluence) (NEW)
+│   ├── dependency-update-with-github-pr.json       # PR workflow (30 nodes, with PR)
+│   ├── dependency-update-with-pr-and-confluence.json # Full workflow (34 nodes, PR + Confluence)
 │   └── main-dependency-update.json                 # Legacy workflow (reference)
 ├── mcp-config/                                     # Confluence MCP setup docs
 ├── confluence-templates/                           # Confluence page templates (HTML)
-│   └── update-page-template.html                   # Updated with npm install error docs (UPDATED)
+│   └── update-page-template.html                   # Confluence Storage Format template
 ├── docs/                                           # Additional documentation
-│   └── CONFLUENCE-INTEGRATION-GUIDE.md             # Complete Confluence setup guide (NEW)
+│   ├── CONFLUENCE-INTEGRATION-GUIDE.md             # Complete Confluence setup guide
+│   ├── GITHUB-PR-INTEGRATION.md                    # GitHub PR integration guide
+│   ├── SETUP-GUIDE.md                              # Detailed setup instructions
+│   └── USAGE-EXAMPLES.md                           # Usage examples and customization
 ├── .env.example                       # Environment template
 ├── .env                               # Your configuration (gitignored)
 ├── package.json                       # n8n + CLI dependencies
 ├── README.md                          # User documentation
 ├── QUICK-START.md                     # 10-minute setup guide
-└── PROJECT-SUMMARY.md                 # Project overview
+└── CLAUDE.md                          # Claude Code guidance (this file)
 ```
 
 ## Development Notes

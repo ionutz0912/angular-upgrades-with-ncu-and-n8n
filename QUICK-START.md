@@ -42,11 +42,14 @@ Login with credentials from `.env`:
 ## 4️⃣ Import Workflow (2 minutes)
 
 1. Click "Import from File"
-2. Select `workflows/test-workflow-v7-angular-test.json` (latest working version)
+2. Select your desired workflow:
+   - `workflows/dependency-update-workflow.json` - Core automation (25 nodes)
+   - `workflows/dependency-update-with-github-pr.json` - Core + PR creation (30 nodes)
+   - `workflows/dependency-update-with-pr-and-confluence.json` - **Full automation** (34 nodes, recommended)
 3. Click "Import"
 4. Activate the workflow (toggle switch)
 
-**Note:** The workflow now uses readable branch names (e.g., `test-deps-update_11-13-2025_07-30-45_AM`) and does NOT automatically delete branches, allowing you to review changes before cleanup.
+**Note:** The workflow uses readable branch names (e.g., `test-deps-update_11-13-2025_07-30-45_AM`) and does NOT automatically delete branches, allowing you to review changes before cleanup.
 
 ## 5️⃣ Test It! (2 minutes)
 
