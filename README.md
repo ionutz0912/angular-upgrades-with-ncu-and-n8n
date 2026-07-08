@@ -1,14 +1,20 @@
 #### n8n is an open-source workflow automation tool that connects different apps and services to automate tasks and data flows through a visual node-based interface."
 
 
-# 🤖 Angular Dependency Automation with n8n, Claude AI & Confluence
+# 🤖 Angular Dependency Automation with n8n, Multi-Provider AI & Confluence
 
-Automated Angular dependency updates using **npm-check-updates**, with **Claude AI-powered error fixing** and **automatic Confluence documentation**.
+Automated Angular dependency updates using **npm-check-updates**, with **Multi-Provider AI error fixing** (Claude, OpenAI, GitHub Copilot, Ollama, Gemini) and **automatic Confluence documentation**.
 
 ## ✨ Features
 
 - 🔄 **Automated Dependency Updates**: Runs npm-check-updates on any schedule (seconds, minutes, hours, days, weeks)
-- 🤖 **AI-Powered Error Fixing**: Claude API automatically fixes **npm install dependency conflicts** and compilation/test errors
+- 🤖 **Multi-Provider AI Error Fixing**: Support for 5 LLM providers with automatic detection and fallback:
+  - **Claude AI** (Anthropic) - claude-sonnet-4-5, claude-opus-4, claude-haiku-4
+  - **OpenAI** - gpt-4o, gpt-4-turbo, gpt-4, gpt-3.5-turbo
+  - **GitHub Copilot** - Uses GitHub token for Copilot API access
+  - **Ollama** (Local LLM) - codellama, deepseek-coder, llama2, mistral
+  - **Google Gemini** - gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash
+- 🔄 **Smart Fallback Chain**: Automatically tries next provider if primary fails
 - 📝 **Confluence Documentation**: Automatically documents all changes, errors, and solutions in Confluence ✅
 - 🌿 **Git Integration**: Creates branches, commits, and pull requests automatically ✅
 - 🔁 **Smart Retry Logic**: Retries fixes up to 3 times with improved context ✅
@@ -24,32 +30,32 @@ Automated Angular dependency updates using **npm-check-updates**, with **Claude 
 - ✅ **PR workflow**: `workflows/dependency-update-with-github-pr.json` (30 nodes) - Core + automated PR creation + branch checkout fix
 - ✅ **Full workflow**: `workflows/dependency-update-with-pr-and-confluence.json` (34 nodes) - Core + PR + Confluence docs + branch checkout fix
 - ✅ **npm install error detection**: `npm-install-with-capture.sh` script captures ERESOLVE and peer dependency conflicts
-- ✅ **Claude AI integration**: Automatically fixes npm install dependency conflicts BEFORE running tests/builds
+- ✅ **Multi-Provider AI integration**: Automatically fixes npm install dependency conflicts using any of 5 LLM providers
 - ✅ **Intelligent error handling**: Separates npm install failures from test/build failures
 - ✅ **Complete automation flow**: Update package.json → npm install (with AI fixes) → Tests/Build validation → GitHub PR → Confluence docs
 - ✅ **GitHub PR Creation**: Fully automated PR creation with professional formatting ([Example PRs](https://github.com/ionutz0912/angular-test-project/pulls))
-- ✅ **Confluence Documentation**: Automatic documentation with npm install errors, Claude AI fixes, and test results ([See Guide](docs/CONFLUENCE-INTEGRATION-GUIDE.md))
+- ✅ **Confluence Documentation**: Automatic documentation with npm install errors, AI-generated fixes, and test results ([See Guide](docs/CONFLUENCE-INTEGRATION-GUIDE.md))
 
 ### Workflow Capabilities:
 - **Core workflow (25 nodes)**: Complete dependency update cycle without PR creation
 - **PR workflow (30 nodes)**: All core features + automatic GitHub PR generation with branch checkout fix
 - **Full workflow (34 nodes)**: All features + automatic Confluence documentation with branch checkout fix
 - Handles common Angular dependency conflicts (peer dependencies, version mismatches, TypeScript version conflicts)
-- Smart retry logic with Claude AI analysis between attempts
+- Smart retry logic with AI analysis between attempts (supports all 5 providers)
 - Clean JSON parsing with separated script execution and result reading
 - Comprehensive error context extraction for AI analysis
 - Professional PR formatting with emoji, tables, and detailed update lists
-- Rich Confluence documentation with color-coded status, error analysis, and Claude AI fixes
+- Rich Confluence documentation with color-coded status, error analysis, and AI-generated fixes
 
 ### Testing History:
 - ✅ Tested with Angular 19 → 20 upgrade (19 dependency updates)
 - ✅ All 8 automation scripts verified working
 - ✅ Full update cycle tested end-to-end (~31 seconds)
 - ✅ All API integrations verified (Claude, GitHub, Confluence)
-- ✅ Claude AI error fixing tested (3 error types, 100% success rate)
+- ✅ Multi-Provider AI error fixing tested (3 error types, 100% success rate with Claude)
 - ✅ GitHub PR creation tested successfully (Multiple PRs: #2, #4)
 - ✅ Confluence documentation tested (2 test pages created successfully)
-- ✅ Decision logic validated (skips Claude AI when not needed)
+- ✅ Decision logic validated (skips AI processing when not needed)
 - ✅ PR formatting validated (markdown, emoji, tables)
 - ✅ Duplicate PR detection working
 - ✅ Confluence page creation with error handling validated
@@ -77,7 +83,7 @@ Automated Angular dependency updates using **npm-check-updates**, with **Claude 
 │                ↓                                                 │
 │           npm install (capture errors)                           │
 │                ↓                                                 │
-│         Install Failed? → YES → Claude AI Fix → Retry           │
+│         Install Failed? → YES → Multi-Provider AI Fix → Retry   │
 │                ↓ NO                                              │
 │         Run Tests & Build → PR + Confluence Docs                │
 └─────────────────────────────────────────────────────────────────┘
@@ -118,11 +124,32 @@ cp .env.example .env
 nano .env
 ```
 
-Required environment variables:
+Required environment variables (configure at least one LLM provider):
 
 ```bash
-# Claude API
+# LLM Provider Priority (auto-detects available providers)
+LLM_PROVIDER_PRIORITY=claude,openai,copilot,ollama,gemini
+LLM_ENABLE_FALLBACK=true
+LLM_PROVIDER_RETRIES=2
+
+# Claude API (optional - if you want to use Claude)
 CLAUDE_API_KEY=sk-ant-api03-your-key-here
+CLAUDE_MODEL=claude-sonnet-4-5
+
+# OpenAI API (optional - if you want to use OpenAI)
+OPENAI_API_KEY=sk-your-openai-key-here
+OPENAI_MODEL=gpt-4o
+
+# GitHub Copilot (optional - if you want to use Copilot)
+GITHUB_COPILOT_TOKEN=ghu_your-copilot-token-here
+
+# Ollama (optional - if you want to use local LLM)
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=codellama
+
+# Gemini API (optional - if you want to use Gemini)
+GEMINI_API_KEY=AIza-your-gemini-key-here
+GEMINI_MODEL=gemini-2.0-flash
 
 # GitHub
 GITHUB_TOKEN=ghp_your_token_here
@@ -302,12 +329,21 @@ Edit the "Set Project Variables" node in the workflow:
 }
 ```
 
-### Changing Claude Model
+### Changing LLM Provider or Model
 
 Update your `.env` file:
 
 ```bash
-CLAUDE_MODEL=claude-sonnet-4-5  # or claude-opus-4
+# Change provider priority order
+LLM_PROVIDER_PRIORITY=openai,claude,gemini
+
+# Change specific models
+CLAUDE_MODEL=claude-opus-4
+OPENAI_MODEL=gpt-4-turbo
+GEMINI_MODEL=gemini-1.5-pro
+
+# Disable fallback (use only first provider)
+LLM_ENABLE_FALLBACK=false
 ```
 
 ### Custom Project Paths
@@ -338,17 +374,30 @@ chmod +x scripts/*.sh
 export NODE_PATH=$(pwd)
 ```
 
-### Issue: Claude API Returns Errors
+### Issue: LLM API Returns Errors
 
-**Solution**: Check API key and rate limits
+**Solution**: Check API keys and configure multiple providers for fallback
 
 ```bash
-# Test Claude API directly
+# The system will automatically try the next provider if one fails
+# Check which providers are available:
+echo "Checking provider availability..."
+
+# Test Claude API
 curl -X POST https://api.anthropic.com/v1/messages \
   -H "x-api-key: $CLAUDE_API_KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "content-type: application/json" \
-  -d '{"model":"claude-sonnet-4-5","max_tokens":1024,"messages":[{"role":"user","content":"test"}]}'
+  -d '{"model":"claude-sonnet-4-5","max_tokens":100,"messages":[{"role":"user","content":"test"}]}'
+
+# Test OpenAI API
+curl -X POST https://api.openai.com/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"test"}],"max_tokens":100}'
+
+# Test Ollama (local)
+curl -X GET http://localhost:11434/api/tags
 ```
 
 ### Issue: Git Push Fails
@@ -498,7 +547,11 @@ MIT License - See LICENSE file for details
 
 - [n8n](https://n8n.io/) - Workflow automation platform
 - [npm-check-updates](https://www.npmjs.com/package/npm-check-updates) - Dependency update tool
-- [Claude AI](https://www.anthropic.com/) - AI-powered error fixing
+- [Claude AI](https://www.anthropic.com/) - AI provider (Anthropic)
+- [OpenAI](https://openai.com/) - AI provider (GPT models)
+- [GitHub Copilot](https://github.com/features/copilot) - AI provider (GitHub)
+- [Ollama](https://ollama.ai/) - Local LLM runner
+- [Google Gemini](https://ai.google.dev/) - AI provider (Google)
 - [Confluence](https://www.atlassian.com/software/confluence) - Documentation platform
 
 ## 📞 Support
@@ -523,4 +576,7 @@ For issues, questions, or suggestions:
 
 ---
 
-**Built with ❤️ using n8n, Claude AI, and modern DevOps practices**
+**Built with ❤️ using n8n, Multi-Provider AI, and modern DevOps practices**
+
+---
+> **ARCHIVED 2026-07-09 — tuition paid:** Angular↔n8n era (Nov–Dec 2025) — longest-lived early project; taught the notification-pipeline patterns still in use
